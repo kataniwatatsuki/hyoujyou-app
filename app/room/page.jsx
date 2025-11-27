@@ -85,35 +85,47 @@ export default function RoomPage() {
             body: form,
           })
             .then((res) => res.json())
-            .then((data) => {
-              setExpression(data.expression);
+            .then(data => {
+  // 新しい表情を履歴に追加
+  setExpressionHistory(prev => {
+    const updated = [...prev, data.expression];
+    if (updated.length > 5) updated.shift(); // 直近5個に制限
+    return updated;
+  });
 
-              // 困り表情の場合
-              if (TROUBLED_EXPRESSIONS.includes(data.expression)) {
-                // まだ困った通知を送っていない場合だけ
-                if (!troubledTimerRef.current && !alreadyTroubled) {
-                  troubledTimerRef.current = setTimeout(() => {
-                    if (ws) {
-                      ws.send(
-                        JSON.stringify({
-                          type: "trouble",
-                          user: username,
-                        })
-                      );
+  // 多数決で安定した表情を表示
+  const counts = {};
+  expressionHistory.forEach(e => counts[e] = (counts[e] || 0) + 1);
+  const stableExpression = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
 
-                      setAlreadyTroubled(true); // ← 通知済み
-                    }
-                    troubledTimerRef.current = null;
-                  }, 2000);
-                }
-              } else {
-                // ★ 表情が戻っても通知解除はしない
-                if (troubledTimerRef.current) {
-                  clearTimeout(troubledTimerRef.current);
-                  troubledTimerRef.current = null;
-                }
-              }
-            })
+  setExpression(stableExpression);
+
+  // 以降の troubled 判定は stableExpression を使用！
+  if (TROUBLED_EXPRESSIONS.includes(stableExpression)) {
+
+    if (!troubledTimerRef.current && !alreadyTroubled) {
+
+      troubledTimerRef.current = setTimeout(() => {
+        if (ws) {
+          ws.send(JSON.stringify({
+            type: "trouble",
+            user: username
+          }));
+          setAlreadyTroubled(true);
+        }
+        troubledTimerRef.current = null;
+      }, 2000);
+
+    }
+
+  } else {
+    if (troubledTimerRef.current) {
+      clearTimeout(troubledTimerRef.current);
+      troubledTimerRef.current = null;
+    }
+  }
+})
+
             .catch((err) => console.error(err));
         },
         "image/jpeg"
