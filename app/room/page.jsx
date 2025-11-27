@@ -10,6 +10,7 @@ export default function RoomPage() {
   const [ws, setWs] = useState(null);
   const [members, setMembers] = useState([]);
   const [alreadyTroubled, setAlreadyTroubled] = useState(false); // ← 必須
+  const [expressionHistory, setExpressionHistory] = useState([]); // ★ 直近5件履歴
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
 
@@ -85,47 +86,47 @@ export default function RoomPage() {
             body: form,
           })
             .then((res) => res.json())
-            .then(data => {
-  // 新しい表情を履歴に追加
-  setExpressionHistory(prev => {
-    const updated = [...prev, data.expression];
-    if (updated.length > 5) updated.shift(); // 直近5個に制限
-    return updated;
-  });
+            .then((data) => {
+              // --- 直近5件に制限して履歴更新 ---
+              setExpressionHistory((prev) => {
+                const updated = [...prev, data.expression];
+                if (updated.length > 5) updated.shift();
 
-  // 多数決で安定した表情を表示
-  const counts = {};
-  expressionHistory.forEach(e => counts[e] = (counts[e] || 0) + 1);
-  const stableExpression = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+                // --- 多数決で安定表情を決定 ---
+                const counts = {};
+                updated.forEach((e) => (counts[e] = (counts[e] || 0) + 1));
+                const stableExpression = Object.keys(counts).reduce((a, b) =>
+                  counts[a] > counts[b] ? a : b
+                );
 
-  setExpression(stableExpression);
+                setExpression(stableExpression);
 
-  // 以降の troubled 判定は stableExpression を使用！
-  if (TROUBLED_EXPRESSIONS.includes(stableExpression)) {
+                // --- troubled判定 ---
+                if (TROUBLED_EXPRESSIONS.includes(stableExpression)) {
+                  if (!troubledTimerRef.current && !alreadyTroubled) {
+                    troubledTimerRef.current = setTimeout(() => {
+                      if (ws) {
+                        ws.send(
+                          JSON.stringify({
+                            type: "trouble",
+                            user: username,
+                          })
+                        );
+                      }
+                      setAlreadyTroubled(true);
+                      troubledTimerRef.current = null;
+                    }, 2000);
+                  }
+                } else {
+                  if (troubledTimerRef.current) {
+                    clearTimeout(troubledTimerRef.current);
+                    troubledTimerRef.current = null;
+                  }
+                }
 
-    if (!troubledTimerRef.current && !alreadyTroubled) {
-
-      troubledTimerRef.current = setTimeout(() => {
-        if (ws) {
-          ws.send(JSON.stringify({
-            type: "trouble",
-            user: username
-          }));
-          setAlreadyTroubled(true);
-        }
-        troubledTimerRef.current = null;
-      }, 2000);
-
-    }
-
-  } else {
-    if (troubledTimerRef.current) {
-      clearTimeout(troubledTimerRef.current);
-      troubledTimerRef.current = null;
-    }
-  }
-})
-
+                return updated;
+              });
+            })
             .catch((err) => console.error(err));
         },
         "image/jpeg"
