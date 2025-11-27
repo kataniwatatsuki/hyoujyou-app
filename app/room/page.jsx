@@ -1,83 +1,64 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-
 export default function RoomPage() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const troubledTimerRef = useRef(null);
   const [expression, setExpression] = useState("平常");
 
-
   const [ws, setWs] = useState(null);
   const [members, setMembers] = useState([]);
-
+  const [alreadyTroubled, setAlreadyTroubled] = useState(false); // ← 必須
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
 
-
-  // ======== ここを ngrok の URL に変更！ ========
   const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
- 
-  // ↑ ngrok 実行時に出た URL に変えてください
 
-
-  // URLパラメータ取得
   const searchParams = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : ""
   );
   const username = searchParams.get("name");
   const room = searchParams.get("room");
 
-
   // WebSocket 接続
   useEffect(() => {
     if (!username || !room) return;
 
+    const socket = new WebSocket(
+      `${API_BASE.replace("https", "wss")}/ws/${room}/${username}`
+    );
 
-    // ========= wss:// にするのが重要！ =========
-    const socket = new WebSocket(`${API_BASE.replace("https", "wss")}/ws/${room}/${username}`);
-
-
-    socket.onopen = () => {
-      console.log("WebSocket connected");
-    };
-
+    socket.onopen = () => console.log("WebSocket connected");
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
-
       if (data.type === "members") setMembers(data.users);
-
 
       if (data.type === "join") console.log(`${data.user} joined.`);
       if (data.type === "leave") console.log(`${data.user} left.`);
-
 
       if (data.type === "trouble") {
         alert(`${data.user} さんが困っています！`);
       }
     };
 
-
     setWs(socket);
-
 
     return () => socket.close();
   }, [username, room]);
 
-
   // カメラ準備
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => {
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
+      .then((stream) => {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
       })
-      .catch(err => console.error("カメラ取得失敗:", err));
+      .catch((err) => console.error("カメラ取得失敗:", err));
   }, []);
-
 
   // 表情認識ループ
   useEffect(() => {
@@ -85,89 +66,77 @@ export default function RoomPage() {
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
-
       if (!video || !canvas || !video.videoWidth) return;
-
 
       const ctx = canvas.getContext("2d");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return;
 
-      canvas.toBlob((blob) => {
-        if (!blob) return;
+          const form = new FormData();
+          form.append("file", blob, "frame.jpg");
 
-
-        const form = new FormData();
-        form.append("file", blob, "frame.jpg");
-
-
-        // ← ngrok の URL に変更
-        fetch(`${API_BASE}/predict`, {
-          method: "POST",
-          body: form,
-        })
-          .then(res => res.json())
-          .then(data => {
-            setExpression(data.expression);
-
-
-            if (TROUBLED_EXPRESSIONS.includes(data.expression)) {
-
-  // まだ困った通知を送っていない場合だけ
-  if (!troubledTimerRef.current && !alreadyTroubled) {
-
-    troubledTimerRef.current = setTimeout(() => {
-      if (ws) {
-        ws.send(JSON.stringify({
-          type: "trouble",
-          user: username
-        }));
-
-        setAlreadyTroubled(true);  // ← 通知済みフラグON
-      }
-
-      troubledTimerRef.current = null;
-    }, 2000);
-  }
-
-} else {
-  // ★ 表情が戻っても何もしない（フラグは解除しない）
-  if (troubledTimerRef.current) {
-    clearTimeout(troubledTimerRef.current);
-    troubledTimerRef.current = null;
-  }
-}
-
+          fetch(`${API_BASE}/predict`, {
+            method: "POST",
+            body: form,
           })
-          .catch(err => console.error(err));
+            .then((res) => res.json())
+            .then((data) => {
+              setExpression(data.expression);
 
+              // 困り表情の場合
+              if (TROUBLED_EXPRESSIONS.includes(data.expression)) {
+                // まだ困った通知を送っていない場合だけ
+                if (!troubledTimerRef.current && !alreadyTroubled) {
+                  troubledTimerRef.current = setTimeout(() => {
+                    if (ws) {
+                      ws.send(
+                        JSON.stringify({
+                          type: "trouble",
+                          user: username,
+                        })
+                      );
 
-      }, "image/jpeg");
-
-
+                      setAlreadyTroubled(true); // ← 通知済み
+                    }
+                    troubledTimerRef.current = null;
+                  }, 2000);
+                }
+              } else {
+                // ★ 表情が戻っても通知解除はしない
+                if (troubledTimerRef.current) {
+                  clearTimeout(troubledTimerRef.current);
+                  troubledTimerRef.current = null;
+                }
+              }
+            })
+            .catch((err) => console.error(err));
+        },
+        "image/jpeg"
+      );
     }, 2000);
-
 
     return () => clearInterval(interval);
-  }, [ws]);
-
+  }, [ws, alreadyTroubled, username]);
 
   return (
     <div style={{ textAlign: "center" }}>
       <h1>ルーム：{room}</h1>
       <h2>名前：{username}</h2>
 
-
-      <video ref={videoRef} style={{ width: "640px", height: "480px", backgroundColor: "black" }} />
+      <video
+        ref={videoRef}
+        style={{ width: "640px", height: "480px", backgroundColor: "black" }}
+      />
       <canvas ref={canvasRef} style={{ display: "none" }} />
-
 
       <p style={{ marginTop: 20, fontSize: "20px" }}>
         現在の表情：<strong>{expression}</strong>
       </p>
-
 
       <div style={{ marginTop: 20 }}>
         <h3>この部屋にいる人：</h3>
@@ -180,27 +149,33 @@ export default function RoomPage() {
                 alignItems: "center",
                 gap: "10px",
                 justifyContent: "flex-start",
-                padding: "2px 0"
+                padding: "2px 0",
               }}
             >
               <span style={{ fontWeight: m.user === username ? "bold" : "normal" }}>
                 {m.user}
               </span>
+
               {m.troubled && (
                 <span style={{ color: "red", fontWeight: "bold" }}>⚠️困っている</span>
               )}
+
               {m.troubled && m.user === username && (
                 <button
-              onClick={() => {
-                if (ws) {
-                ws.send(JSON.stringify({ type: "resolved", user: username }));
-                }
-                setAlreadyTroubled(false);  // ← ここで初めて通知可能状態に戻す
-              }}
-            >
-              解決
-            </button>
-
+                  onClick={() => {
+                    if (ws) {
+                      ws.send(
+                        JSON.stringify({
+                          type: "resolved",
+                          user: username,
+                        })
+                      );
+                    }
+                    setAlreadyTroubled(false); // ← 解決ボタンで解除
+                  }}
+                >
+                  解決
+                </button>
               )}
             </div>
           ))}
