@@ -10,7 +10,7 @@ export default function RoomPage() {
 
   const [ws, setWs] = useState(null);
   const [members, setMembers] = useState([]);
-
+  const [isTroubled, setIsTroubled] = useState(false);
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
 
   // ======== ここを ngrok の URL に変更！ ========
