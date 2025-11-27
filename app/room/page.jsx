@@ -45,6 +45,9 @@ export default function RoomPage() {
       if (data.type === "leave") console.log(`${data.user} left.`);
 
       if (data.type === "trouble") {
+        setMembers(prev => prev.map(m => 
+          m.user === data.user ? { ...m, troubled: true } : m
+         ));
         alert(`${data.user} さんが困っています！`);
       }
         // ← 追加：困り解除メッセージの受信処理
