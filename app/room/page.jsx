@@ -114,23 +114,32 @@ export default function RoomPage() {
 
 
             if (TROUBLED_EXPRESSIONS.includes(data.expression)) {
-              if (!troubledTimerRef.current) {
-                troubledTimerRef.current = setTimeout(() => {
-                  if (ws) {
-                    ws.send(JSON.stringify({
-                      type: "trouble",
-                      user: username
-                    }));
-                  }
-                  troubledTimerRef.current = null;
-                }, 2000);
-              }
-            } else {
-              if (troubledTimerRef.current) {
-                clearTimeout(troubledTimerRef.current);
-                troubledTimerRef.current = null;
-              }
-            }
+
+  // まだ困った通知を送っていない場合だけ
+  if (!troubledTimerRef.current && !alreadyTroubled) {
+
+    troubledTimerRef.current = setTimeout(() => {
+      if (ws) {
+        ws.send(JSON.stringify({
+          type: "trouble",
+          user: username
+        }));
+
+        setAlreadyTroubled(true);  // ← 通知済みフラグON
+      }
+
+      troubledTimerRef.current = null;
+    }, 2000);
+  }
+
+} else {
+  // ★ 表情が戻っても何もしない（フラグは解除しない）
+  if (troubledTimerRef.current) {
+    clearTimeout(troubledTimerRef.current);
+    troubledTimerRef.current = null;
+  }
+}
+
           })
           .catch(err => console.error(err));
 
@@ -182,14 +191,16 @@ export default function RoomPage() {
               )}
               {m.troubled && m.user === username && (
                 <button
-                  onClick={() => {
-                    if (ws) {
-                      ws.send(JSON.stringify({ type: "resolved", user: username }));
-                    }
-                  }}
-                >
-                  解決
-                </button>
+              onClick={() => {
+                if (ws) {
+                ws.send(JSON.stringify({ type: "resolved", user: username }));
+                }
+                setAlreadyTroubled(false);  // ← ここで初めて通知可能状態に戻す
+              }}
+            >
+              解決
+            </button>
+
               )}
             </div>
           ))}
