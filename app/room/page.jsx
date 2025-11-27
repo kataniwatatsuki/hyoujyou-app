@@ -47,6 +47,12 @@ export default function RoomPage() {
       if (data.type === "trouble") {
         alert(`${data.user} さんが困っています！`);
       }
+        // ← 追加：困り解除メッセージの受信処理
+  if (data.type === "resolved") {
+    if (data.user === username) {
+      setIsTroubled(false);
+    }
+    }
     };
 
     setWs(socket);
