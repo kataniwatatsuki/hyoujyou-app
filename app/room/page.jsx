@@ -93,18 +93,23 @@ export default function RoomPage() {
             setExpression(data.expression);
 
             if (TROUBLED_EXPRESSIONS.includes(data.expression)) {
-              if (!troubledTimerRef.current) {
-                troubledTimerRef.current = setTimeout(() => {
-                  if (ws) {
-                    ws.send(JSON.stringify({
-                      type: "trouble",
-                      user: username
-                    }));
-                  }
-                  troubledTimerRef.current = null;
-                }, 2000);
-              }
-            } else {
+
+  // ▶▶ すでに困り中なら、もう trouble を送らない
+  if (isTroubled) return;
+
+  if (!troubledTimerRef.current) {
+    troubledTimerRef.current = setTimeout(() => {
+      if (ws) {
+        ws.send(JSON.stringify({
+          type: "trouble",
+          user: username
+        }));
+        setIsTroubled(true);  // ← ここ重要！困り中フラグON
+      }
+      troubledTimerRef.current = null;
+    }, 2000);
+  }
+} else {
               if (troubledTimerRef.current) {
                 clearTimeout(troubledTimerRef.current);
                 troubledTimerRef.current = null;
@@ -157,6 +162,7 @@ export default function RoomPage() {
                   onClick={() => {
                     if (ws) {
                       ws.send(JSON.stringify({ type: "resolved", user: username }));
+                      setIsTroubled(false);
                     }
                   }}
                 >
