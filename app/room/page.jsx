@@ -24,35 +24,53 @@ export default function RoomPage() {
   const room = searchParams.get("room");
 
   // WebSocket 接続
-  useEffect(() => {
-    if (!username || !room) return;
+  // WebSocket 接続（自動再接続つき）
+useEffect(() => {
+  if (!username || !room) return;
 
-  const wsUrl = API_BASE.startsWith("https")
-    ? API_BASE.replace("https://", "wss://")
-    : API_BASE.replace("http://", "ws://");
+  let socket;
+  let reconnectTimer;
 
-  const socket = new WebSocket(`${wsUrl}/ws/${room}/${username}`);
+  const connect = () => {
+    const wsUrl = API_BASE.startsWith("https")
+      ? API_BASE.replace("https://", "wss://")
+      : API_BASE.replace("http://", "ws://");
 
+    socket = new WebSocket(`${wsUrl}/ws/${room}/${username}`);
 
-    socket.onopen = () => console.log("WebSocket connected");
+    socket.onopen = () => {
+      console.log("WebSocket connected");
+      setWs(socket);
+    };
+
+    socket.onclose = () => {
+      console.log("WebSocket disconnected... retrying in 3s");
+      reconnectTimer = setTimeout(connect, 3000); // ⬅ 自動再接続
+    };
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
       if (data.type === "members") setMembers(data.users);
-
       if (data.type === "join") console.log(`${data.user} joined.`);
       if (data.type === "leave") console.log(`${data.user} left.`);
-
       if (data.type === "trouble") {
         alert(`${data.user} さんが困っています！`);
       }
+      if (data.type === "ping") {
+        // backend からの ping（無視してOK）
+      }
     };
+  };
 
-    setWs(socket);
+  connect();
 
-    return () => socket.close();
-  }, [username, room]);
+  return () => {
+    clearTimeout(reconnectTimer);
+    if (socket) socket.close();
+  };
+}, [username, room]);
+
 
   // カメラ準備
   useEffect(() => {
