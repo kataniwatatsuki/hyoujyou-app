@@ -1,85 +1,68 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
+
 export default function RoomPage() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const troubledTimerRef = useRef(null);
-  const [expression, setExpression] = useState("検出不可");
+  const [expression, setExpression] = useState("平常");
+
 
   const [ws, setWs] = useState(null);
   const [members, setMembers] = useState([]);
   const [alreadyTroubled, setAlreadyTroubled] = useState(false); // ← 必須
   const [expressionHistory, setExpressionHistory] = useState([]); // ★ 直近5件履歴
 
+
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
 
-  const API_BASE = "https://ai-backend-api-5cko.onrender.com";
-  //const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
-  
+
+  const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
+
+
   const searchParams = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : ""
   );
   const username = searchParams.get("name");
   const room = searchParams.get("room");
 
+
   // WebSocket 接続
-  // WebSocket 接続（自動再接続つき）
-// WebSocket 接続（自動再接続つき・members反映修正版）
-useEffect(() => {
-  if (!username || !room) return;
+  useEffect(() => {
+    if (!username || !room) return;
 
-  let socket;
-  let reconnectTimer;
 
-  const connect = () => {
-    const wsUrl = API_BASE.startsWith("https")
-      ? API_BASE.replace("https://", "wss://")
-      : API_BASE.replace("http://", "ws://");
+    const socket = new WebSocket(
+      `${API_BASE.replace("https", "wss")}/ws/${room}/${username}`
+    );
 
-    socket = new WebSocket(`${wsUrl}/ws/${room}/${username}`);
 
-    socket.onopen = () => {
-      console.log("WebSocket connected");
+    socket.onopen = () => console.log("WebSocket connected");
 
-      // ←ここで初めて ws を state にセット
-      setWs(socket);
 
-      // ←接続後に message イベント登録
-      socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
 
-        if (data.type === "members") {
-          console.log("members:", data.users); // デバッグ用
-          setMembers(data.users);
-        }
 
-        if (data.type === "join") console.log(`${data.user} joined.`);
-        if (data.type === "leave") console.log(`${data.user} left.`);
+      if (data.type === "members") setMembers(data.users);
 
-        if (data.type === "trouble") {
-          alert(`${data.user} さんが困っています！`);
-        }
-        if (data.type === "ping") {
-          // backend からの ping は無視
-        }
-      };
+
+      if (data.type === "join") console.log(`${data.user} joined.`);
+      if (data.type === "leave") console.log(`${data.user} left.`);
+
+
+      if (data.type === "trouble") {
+        alert(`${data.user} さんが困っています！`);
+      }
     };
 
-    socket.onclose = () => {
-      console.log("WebSocket disconnected... retrying in 3s");
-      reconnectTimer = setTimeout(connect, 3000); // 自動再接続
-    };
-  };
 
-  connect();
+    setWs(socket);
 
-  return () => {
-    clearTimeout(reconnectTimer);
-    if (socket) socket.close();
-  };
-}, [username, room]);
 
+    return () => socket.close();
+  }, [username, room]);
 
 
   // カメラ準備
@@ -93,25 +76,31 @@ useEffect(() => {
       .catch((err) => console.error("カメラ取得失敗:", err));
   }, []);
 
+
   // 表情認識ループ
   useEffect(() => {
     const interval = setInterval(() => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
+
       if (!video || !canvas || !video.videoWidth) return;
+
 
       const ctx = canvas.getContext("2d");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+
       canvas.toBlob(
         (blob) => {
           if (!blob) return;
 
+
           const form = new FormData();
           form.append("file", blob, "frame.jpg");
+
 
           fetch(`${API_BASE}/predict`, {
             method: "POST",
@@ -122,7 +111,8 @@ useEffect(() => {
               // --- 直近5件に制限して履歴更新 ---
               setExpressionHistory((prev) => {
                 const updated = [...prev, data.expression];
-                if (updated.length > 3) updated.shift();
+                if (updated.length > 5) updated.shift();
+
 
                 // --- 多数決で安定表情を決定 ---
                 const counts = {};
@@ -131,7 +121,9 @@ useEffect(() => {
                   counts[a] > counts[b] ? a : b
                 );
 
+
                 setExpression(stableExpression);
+
 
                 // --- troubled判定 ---
                 if (TROUBLED_EXPRESSIONS.includes(stableExpression)) {
@@ -156,6 +148,7 @@ useEffect(() => {
                   }
                 }
 
+
                 return updated;
               });
             })
@@ -165,13 +158,16 @@ useEffect(() => {
       );
     }, 2000);
 
+
     return () => clearInterval(interval);
   }, [ws, alreadyTroubled, username]);
+
 
   return (
     <div style={{ textAlign: "center" }}>
       <h1>ルーム：{room}</h1>
       <h2>名前：{username}</h2>
+
 
       <video
         ref={videoRef}
@@ -179,9 +175,11 @@ useEffect(() => {
       />
       <canvas ref={canvasRef} style={{ display: "none" }} />
 
+
       <p style={{ marginTop: 20, fontSize: "20px" }}>
         現在の表情：<strong>{expression}</strong>
       </p>
+
 
       <div style={{ marginTop: 20 }}>
         <h3>この部屋にいる人：</h3>
@@ -201,9 +199,11 @@ useEffect(() => {
                 {m.user}
               </span>
 
+
               {m.troubled && (
                 <span style={{ color: "red", fontWeight: "bold" }}>⚠️困っている</span>
               )}
+
 
               {m.troubled && m.user === username && (
                 <button
@@ -229,3 +229,5 @@ useEffect(() => {
     </div>
   );
 }
+
+
