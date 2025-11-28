@@ -25,6 +25,7 @@ export default function RoomPage() {
 
   // WebSocket 接続
   // WebSocket 接続（自動再接続つき）
+// WebSocket 接続（自動再接続つき・members反映修正版）
 useEffect(() => {
   if (!username || !room) return;
 
@@ -40,26 +41,34 @@ useEffect(() => {
 
     socket.onopen = () => {
       console.log("WebSocket connected");
+
+      // ←ここで初めて ws を state にセット
       setWs(socket);
+
+      // ←接続後に message イベント登録
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "members") {
+          console.log("members:", data.users); // デバッグ用
+          setMembers(data.users);
+        }
+
+        if (data.type === "join") console.log(`${data.user} joined.`);
+        if (data.type === "leave") console.log(`${data.user} left.`);
+
+        if (data.type === "trouble") {
+          alert(`${data.user} さんが困っています！`);
+        }
+        if (data.type === "ping") {
+          // backend からの ping は無視
+        }
+      };
     };
 
     socket.onclose = () => {
       console.log("WebSocket disconnected... retrying in 3s");
-      reconnectTimer = setTimeout(connect, 3000); // ⬅ 自動再接続
-    };
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.type === "members") setMembers(data.users);
-      if (data.type === "join") console.log(`${data.user} joined.`);
-      if (data.type === "leave") console.log(`${data.user} left.`);
-      if (data.type === "trouble") {
-        alert(`${data.user} さんが困っています！`);
-      }
-      if (data.type === "ping") {
-        // backend からの ping（無視してOK）
-      }
+      reconnectTimer = setTimeout(connect, 3000); // 自動再接続
     };
   };
 
@@ -70,6 +79,7 @@ useEffect(() => {
     if (socket) socket.close();
   };
 }, [username, room]);
+
 
 
   // カメラ準備
