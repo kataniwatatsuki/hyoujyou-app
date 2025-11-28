@@ -14,8 +14,8 @@ export default function RoomPage() {
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
 
-  //const API_BASE = "https://ai-backend-api-5cko.onrender.com";
-  const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
+  const API_BASE = "https://ai-backend-api-5cko.onrender.com";
+  //const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
   
   const searchParams = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : ""
@@ -27,9 +27,12 @@ export default function RoomPage() {
   useEffect(() => {
     if (!username || !room) return;
 
-    const socket = new WebSocket(
-      `${API_BASE.replace("https", "wss")}/ws/${room}/${username}`
-    );
+  const wsUrl = API_BASE.startsWith("https")
+    ? API_BASE.replace("https://", "wss://")
+    : API_BASE.replace("http://", "ws://");
+
+  const socket = new WebSocket(`${wsUrl}/ws/${room}/${username}`);
+
 
     socket.onopen = () => console.log("WebSocket connected");
 
