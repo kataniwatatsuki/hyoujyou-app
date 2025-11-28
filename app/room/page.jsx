@@ -116,7 +116,7 @@ export default function RoomPage() {
                       }
                       setAlreadyTroubled(true);
                       troubledTimerRef.current = null;
-                    }, 10000);
+                    }, 1000);
                   }
                 } else {
                   if (troubledTimerRef.current) {
