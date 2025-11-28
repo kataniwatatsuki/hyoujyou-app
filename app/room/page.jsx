@@ -14,7 +14,7 @@ export default function RoomPage() {
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
 
-  const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
+  const API_BASE = "https://ai-backend-api-5cko.onrender.com/";
 
   const searchParams = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : ""
