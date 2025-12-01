@@ -19,7 +19,8 @@ export default function RoomPage() {
 
 
   //const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
-  const API_BASE = "https://janet-lamb-cartridge-locator.trycloudflare.com";
+  const API_BASE = "https://auburn-entered-futures-jackson.trycloudflare.com";
+
 
 
   const searchParams = new URLSearchParams(
