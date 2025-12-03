@@ -17,8 +17,9 @@ export default function RoomPage() {
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
 
+  const API_BASE = "https://ai-backend-izj9.onrender.com";
 
-  const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
+  //const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
   //const API_BASE = "https://sense-revealed-tba-medicine.trycloudflare.com";
 
 
