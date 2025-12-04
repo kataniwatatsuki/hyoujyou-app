@@ -28,9 +28,10 @@ export default function RoomPage() {
     if (!username || !room) return;
 
     const s = io(API_BASE, {
-      path: "/socket.io",
+      path: "/socket.io/socket.io",
       transports: ["websocket"],
     });
+
 
     setSocket(s);
 
