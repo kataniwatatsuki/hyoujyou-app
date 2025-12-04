@@ -15,7 +15,7 @@ export default function RoomPage() {
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
   // ngrok の公開 URL を使う（あなたの既存の値）
-  const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
+  const API_BASE = "https://dimension-shade-hide-keen.trycloudflare.com";
 
   const searchParams = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : ""
