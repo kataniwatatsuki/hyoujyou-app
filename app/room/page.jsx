@@ -5,110 +5,88 @@ export default function RoomPage() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const troubledTimerRef = useRef(null);
-  const evtSourceRef = useRef(null);
+  const evtRef = useRef(null);
 
   const [expression, setExpression] = useState("平常");
   const [members, setMembers] = useState([]);
   const [alreadyTroubled, setAlreadyTroubled] = useState(false);
   const [expressionHistory, setExpressionHistory] = useState([]);
-  const [sid, setSid] = useState(null);
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
-  // ← ここを cloudflared が生成した URL に置き換えてください
-  const API_BASE = "https://dimension-shade-hide-keen.trycloudflare.com";
+  // ここを cloudflared が出した URL に変更してください
+  const API_BASE = "https://classification-evolution-requirements-advocacy.trycloudflare.com";
 
-  const searchParams = new URLSearchParams(
-    typeof window !== "undefined" ? window.location.search : ""
-  );
+  const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const username = searchParams.get("name");
   const room = searchParams.get("room");
 
-  // join & SSE setup
+  // SSE 接続（/events/{room}/{user}）
   useEffect(() => {
     if (!username || !room) return;
-    let mounted = true;
+    const url = `${API_BASE}/events/${encodeURIComponent(room)}/${encodeURIComponent(username)}`;
+    const es = new EventSource(url);
+    evtRef.current = es;
 
-    async function joinAndListen() {
+    es.onopen = () => console.log("SSE connected");
+    es.onmessage = (e) => {
       try {
-        const res = await fetch(`${API_BASE}/join`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ room, user: username }),
-        });
-        const data = await res.json();
-        if (!mounted) return;
-        setSid(data.sid);
-
-        // connect to SSE (include sid for debug/resilience)
-        const evt = new EventSource(`${API_BASE}/events?room=${encodeURIComponent(room)}&sid=${encodeURIComponent(data.sid)}`);
-        evtSourceRef.current = evt;
-
-        evt.onopen = () => console.log("SSE connected");
-        evt.onmessage = (e) => {
-          // generic message event (we always send JSON in data)
-          try {
-            const payload = JSON.parse(e.data);
-            handleServerEvent(payload);
-          } catch (err) {
-            console.warn("invalid SSE payload", e.data);
-          }
-        };
-        // ping event (keepalive)
-        evt.addEventListener("ping", (e) => {
-          // optional: console.log("ping", e.data);
-        });
-        evt.onerror = (err) => {
-          console.error("SSE error", err);
-        };
+        const payload = JSON.parse(e.data);
+        handleServerEvent(payload);
       } catch (err) {
-        console.error("join failed", err);
+        console.warn("invalid payload", e.data);
       }
-    }
+    };
+    es.addEventListener("ping", (e) => {
+      // keepalive
+      // console.log("ping", e.data);
+    });
+    es.onerror = (err) => {
+      console.error("SSE error", err);
+    };
 
-    joinAndListen();
+    // leave on unload
+    const onUnload = () => {
+      try {
+        navigator.sendBeacon && navigator.sendBeacon(`${API_BASE}/leave`, JSON.stringify({ room, user: username }));
+      } catch (e) {
+        // fallback
+        fetch(`${API_BASE}/leave`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ room, user: username }) }).catch(()=>{});
+      }
+      es.close();
+    };
+    window.addEventListener("beforeunload", onUnload);
 
     return () => {
-      mounted = false;
-      if (evtSourceRef.current) {
-        evtSourceRef.current.close();
-        evtSourceRef.current = null;
-      }
-      // optionally tell server /leave (not required but polite)
-      if (sid) {
-        fetch(`${API_BASE}/leave`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ room, sid }),
-        }).catch(() => {});
-      }
+      window.removeEventListener("beforeunload", onUnload);
+      if (es) es.close();
     };
   }, [username, room]);
 
-  // SSE event handler
   function handleServerEvent(payload) {
     if (!payload || !payload.type) return;
     if (payload.type === "members") {
       setMembers(payload.users || []);
     } else if (payload.type === "join") {
-      // optional notification
       console.log(`${payload.user} joined`);
     } else if (payload.type === "leave") {
       console.log(`${payload.user} left`);
     } else if (payload.type === "trouble") {
       alert(`${payload.user} さんが困っています！`);
-    } else {
-      console.log("SSE event", payload);
+    } else if (payload.type === "resolved") {
+      // optional
+      console.log(`${payload.user} resolved`);
     }
   }
 
-  // camera setup (same as before)
+  // カメラ準備
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
       }
-    }).catch(console.error);
+    }).catch((err) => console.error("camera error", err));
+
     return () => {
       try {
         const s = videoRef.current?.srcObject;
@@ -117,7 +95,7 @@ export default function RoomPage() {
     };
   }, []);
 
-  // expression detection logic (unchanged)
+  // 表情認識ループ（predictはそのまま）
   useEffect(() => {
     const interval = setInterval(() => {
       const video = videoRef.current;
@@ -142,30 +120,20 @@ export default function RoomPage() {
 
               const counts = {};
               updated.forEach(e => counts[e] = (counts[e] || 0) + 1);
-              const stable = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+              const stable = Object.keys(counts).reduce((a,b) => counts[a] > counts[b] ? a : b);
 
               setExpression(stable);
 
+              // troubled 判定（同じロジック）
               if (TROUBLED_EXPRESSIONS.includes(stable)) {
                 if (!troubledTimerRef.current && !alreadyTroubled) {
                   troubledTimerRef.current = setTimeout(() => {
-                    if (sid) {
-                      fetch(`${API_BASE}/trouble`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ room, sid }),
-                      }).catch(console.error);
-                    } else {
-                      setTimeout(() => {
-                        if (sid) {
-                          fetch(`${API_BASE}/trouble`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ room, sid }),
-                          }).catch(console.error);
-                        }
-                      }, 500);
-                    }
+                    // POST /trouble
+                    fetch(`${API_BASE}/trouble`, {
+                      method: "POST",
+                      headers: {"Content-Type":"application/json"},
+                      body: JSON.stringify({ room, user: username })
+                    }).catch(console.error);
                     setAlreadyTroubled(true);
                     troubledTimerRef.current = null;
                   }, 2000);
@@ -184,21 +152,15 @@ export default function RoomPage() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [sid, alreadyTroubled]);
+  }, [alreadyTroubled]);
 
-  // resolved handler
-  const handleResolved = async () => {
-    if (!sid) return;
-    try {
-      await fetch(`${API_BASE}/resolved`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room, sid }),
-      });
-      setAlreadyTroubled(false);
-    } catch (e) {
-      console.error("resolved failed", e);
-    }
+  const handleResolved = () => {
+    fetch(`${API_BASE}/resolved`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ room, user: username })
+    }).catch(console.error);
+    setAlreadyTroubled(false);
   };
 
   return (
@@ -213,9 +175,9 @@ export default function RoomPage() {
 
       <h3>この部屋にいる人：</h3>
       {members.map((m, idx) => (
-        <div key={idx} style={{ marginBottom: "8px" }}>
-          <span>{m.user}</span>
-          {m.troubled && <span style={{ color: "red" }}> ⚠️困っている</span>}
+        <div key={idx} style={{ marginBottom: 8 }}>
+          <span style={{ fontWeight: m.user === username ? "bold" : "normal" }}>{m.user}</span>
+          {m.troubled && <span style={{ color: "red", marginLeft: 8 }}>⚠️困っている</span>}
           {m.troubled && m.user === username && (
             <button onClick={handleResolved} style={{ marginLeft: 10 }}>解決</button>
           )}
