@@ -28,27 +28,20 @@ export default function RoomPage() {
     if (!username || !room) return;
 
     const s = io(API_BASE, {
-      path: "/socket.io",
+      path: "/socket.io",  // 修正
       transports: ["websocket"],
     });
-
-
 
     setSocket(s);
 
     s.on("connect", () => {
       console.log("Socket.IO connected");
-
-      s.emit("join_room", {
-        room,
-        user: username,
-      });
+      s.emit("join_room", { room, user: username });
     });
 
     s.on("members", (data) => setMembers(data.users));
     s.on("join", (data) => console.log(`${data.user} joined.`));
     s.on("leave", (data) => console.log(`${data.user} left.`));
-
     s.on("trouble", (data) => {
       alert(`${data.user} さんが困っています！`);
     });
@@ -71,7 +64,6 @@ export default function RoomPage() {
     const interval = setInterval(() => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-
       if (!video || !canvas || !video.videoWidth) return;
 
       const ctx = canvas.getContext("2d");
@@ -79,57 +71,47 @@ export default function RoomPage() {
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return;
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const form = new FormData();
+        form.append("file", blob, "frame.jpg");
 
-          const form = new FormData();
-          form.append("file", blob, "frame.jpg");
+        fetch(`${API_BASE}/predict`, { method: "POST", body: form })
+          .then((res) => res.json())
+          .then((data) => {
+            setExpressionHistory((prev) => {
+              const updated = [...prev, data.expression];
+              if (updated.length > 5) updated.shift();
 
-          fetch(`${API_BASE}/predict`, { method: "POST", body: form })
-            .then((res) => res.json())
-            .then((data) => {
+              const counts = {};
+              updated.forEach((e) => (counts[e] = (counts[e] || 0) + 1));
+              const stable = Object.keys(counts).reduce((a, b) =>
+                counts[a] > counts[b] ? a : b
+              );
 
-              setExpressionHistory((prev) => {
-                const updated = [...prev, data.expression];
-                if (updated.length > 5) updated.shift();
+              setExpression(stable);
 
-                // 多数決で安定表情決定
-                const counts = {};
-                updated.forEach((e) => (counts[e] = (counts[e] || 0) + 1));
-                const stable = Object.keys(counts).reduce((a, b) =>
-                  counts[a] > counts[b] ? a : b
-                );
-
-                setExpression(stable);
-
-                // ===== 困った状態の送信 =====
-                if (TROUBLED_EXPRESSIONS.includes(stable)) {
-                  if (!troubledTimerRef.current && !alreadyTroubled) {
-                    troubledTimerRef.current = setTimeout(() => {
-                      if (socket && socket.connected) {
-                        socket.emit("trouble", {
-                          room,
-                          user: username,
-                        });
-                      }
-                      setAlreadyTroubled(true);
-                      troubledTimerRef.current = null;
-                    }, 2000);
-                  }
-                } else {
-                  if (troubledTimerRef.current) {
-                    clearTimeout(troubledTimerRef.current);
+              if (TROUBLED_EXPRESSIONS.includes(stable)) {
+                if (!troubledTimerRef.current && !alreadyTroubled) {
+                  troubledTimerRef.current = setTimeout(() => {
+                    if (socket && socket.connected) {
+                      socket.emit("trouble", { room, user: username });
+                    }
+                    setAlreadyTroubled(true);
                     troubledTimerRef.current = null;
-                  }
+                  }, 2000);
                 }
+              } else {
+                if (troubledTimerRef.current) {
+                  clearTimeout(troubledTimerRef.current);
+                  troubledTimerRef.current = null;
+                }
+              }
 
-                return updated;
-              });
+              return updated;
             });
-        },
-        "image/jpeg"
-      );
+          });
+      }, "image/jpeg");
     }, 2000);
 
     return () => clearInterval(interval);
@@ -151,7 +133,6 @@ export default function RoomPage() {
           <span>{m.user}</span>
           {m.troubled && <span style={{ color: "red" }}> ⚠️困っている</span>}
 
-          {/* 自分が困っている状態のときだけ表示 */}
           {m.troubled && m.user === username && (
             <button
               onClick={() => {
