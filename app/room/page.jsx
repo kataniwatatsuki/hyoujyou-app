@@ -14,7 +14,7 @@ export default function RoomPage() {
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
   // ここを cloudflared が出した URL に変更してください
-  const API_BASE = "https://classification-evolution-requirements-advocacy.trycloudflare.com";
+  const API_BASE = "https://tub-grammar-clinical-approved.trycloudflare.com";
 
   const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const username = searchParams.get("name");
