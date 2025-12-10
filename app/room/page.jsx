@@ -14,11 +14,18 @@ export default function RoomPage() {
   const [alreadyTroubled, setAlreadyTroubled] = useState(false); // ← 必須
   const [expressionHistory, setExpressionHistory] = useState([]); // ★ 直近5件履歴
 
+  useEffect(() => {
+    if (typeof Notification !== "undefined") {
+      Notification.requestPermission();
+    }
+  }, []);
+
 
   const TROUBLED_EXPRESSIONS = ["angry", "disgust", "fear", "sad"];
 
 
-  const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
+  //const API_BASE = "https://nonexperienced-patrice-unparcelling.ngrok-free.dev";
+  const API_BASE = "http://localhost:8000";
 
 
   const searchParams = new URLSearchParams(
@@ -53,7 +60,14 @@ export default function RoomPage() {
 
 
       if (data.type === "trouble") {
-        alert(`${data.user} さんが困っています！`);
+  // ブラウザ通知
+        if (Notification.permission === "granted") {
+          new Notification("困っています！", {
+            body: `${data.user} さんが困っています！`,
+          });
+        } else {
+          alert(`${data.user} さんが困っています！`);
+        }
       }
     };
 
@@ -171,7 +185,7 @@ export default function RoomPage() {
 
       <video
         ref={videoRef}
-        style={{ width: "640px", height: "480px", backgroundColor: "black" }}
+        style={{ width: "640px", height: "480px", backgroundColor: "black" ,display: "block",margin: "0 auto"}}
       />
       <canvas ref={canvasRef} style={{ display: "none" }} />
 
@@ -191,7 +205,7 @@ export default function RoomPage() {
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
-                justifyContent: "flex-start",
+                justifyContent: "center",
                 padding: "2px 0",
               }}
             >
