@@ -6,7 +6,7 @@ export default function RoomPage() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const troubledTimerRef = useRef(null);
-  const [expression, setExpression] = useState("平常");
+  const [expression, setExpression] = useState("検出不可");
 
 
   const [ws, setWs] = useState(null);
@@ -125,7 +125,7 @@ export default function RoomPage() {
               // --- 直近5件に制限して履歴更新 ---
               setExpressionHistory((prev) => {
                 const updated = [...prev, data.expression];
-                if (updated.length > 5) updated.shift();
+                if (updated.length > 3) updated.shift();
 
 
                 // --- 多数決で安定表情を決定 ---
