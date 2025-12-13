@@ -66,16 +66,32 @@ export default function HomePage() {
 
 
       <button
-        onClick={handleJoin}
-        style={{
-          marginTop: 30,
-          padding: "12px 25px",
-          fontSize: "16px",
-          cursor: "pointer",
-        }}
-      >
-        入室する
-      </button>
+  onClick={handleJoin}
+  style={{
+    marginTop: 30,
+    padding: "12px 30px",
+    fontSize: "16px",
+    fontWeight: "bold",
+    color: "#333",
+    background: "#ffffff",
+    border: "2px solid #ddd",
+    borderRadius: "10px",
+    cursor: "pointer",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+    transition: "all 0.2s ease",
+  }}
+  onMouseOver={(e) => {
+    e.currentTarget.style.background = "#f5f5f5";
+    e.currentTarget.style.borderColor = "#bbb";
+  }}
+  onMouseOut={(e) => {
+    e.currentTarget.style.background = "#ffffff";
+    e.currentTarget.style.borderColor = "#ddd";
+  }}
+>
+  入室する
+</button>
+
     </div>
   );
 }
