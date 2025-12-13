@@ -12,7 +12,7 @@ export default function RoomPage() {
   const [ws, setWs] = useState(null);
   const [members, setMembers] = useState([]);
   const [alreadyTroubled, setAlreadyTroubled] = useState(false); // ← 必須
-  const [expressionHistory, setExpressionHistory] = useState([]); // ★ 直近5件履歴
+  const [expressionHistory, setExpressionHistory] = useState([]); // ★ 直近3件履歴
 
   useEffect(() => {
     if (typeof Notification !== "undefined") {
@@ -122,7 +122,7 @@ export default function RoomPage() {
           })
             .then((res) => res.json())
             .then((data) => {
-              // --- 直近5件に制限して履歴更新 ---
+              // --- 直近3件に制限して履歴更新 ---
               setExpressionHistory((prev) => {
                 const updated = [...prev, data.expression];
                 if (updated.length > 3) updated.shift();
