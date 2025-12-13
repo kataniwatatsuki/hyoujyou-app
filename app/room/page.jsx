@@ -11,7 +11,10 @@ export default function RoomPage() {
   const [members, setMembers] = useState([]);
   const [alreadyTroubled, setAlreadyTroubled] = useState(false);
   const [expressionHistory, setExpressionHistory] = useState([]);
-// ★ A案用：YES/NOを促す通知を一度だけ出すため
+
+  const [autoDetected, setAutoDetected] = useState(false);
+
+  // ★ A案用：YES/NOを促す通知を一度だけ出すため
   const [confirmNotified, setConfirmNotified] = useState(false);
 
   // ★ B案用：確認UI表示フラグ
@@ -115,8 +118,20 @@ export default function RoomPage() {
 
                 // ★ B案：困り検出 → UI表示のみ（自動通知しない）
                 if (TROUBLED_EXPRESSIONS.includes(stableExpression)) {
-                  if (!alreadyTroubled && !showConfirm) {
-                    setShowConfirm(true);
+                  if (!alreadyTroubled && !showConfirm && !autoDetected) {
+                    
+                fetch(`${API_BASE}/log`, {  
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },  
+                  body: JSON.stringify({    
+                    type: "auto_detect",   
+                    user: username,    
+                    room: room,   
+                    expression: stableExpression  
+                  }),
+                });
+                setAutoDetected(true);  
+                setShowConfirm(true);
                   }
                 }
 
@@ -180,6 +195,16 @@ useEffect(() => {
     onClick={() => {
       if (alreadyTroubled) return;
 
+      fetch(`${API_BASE}/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "manual_trouble",
+          user: username,
+          room: room,
+        }),
+      });
+
       if (ws) {
         ws.send(
           JSON.stringify({
@@ -239,6 +264,15 @@ useEffect(() => {
       boxShadow: "0 2px 6px rgba(22,119,255,0.4)",
     }}
     onClick={() => {
+      fetch(`${API_BASE}/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "resolved",
+          user: username,
+         room: room
+        }),
+      });
       if (ws) {
         ws.send(
           JSON.stringify({
@@ -249,6 +283,7 @@ useEffect(() => {
       }
       setAlreadyTroubled(false);
       setShowConfirm(false);
+      setAutoDetected(false);
     }}
   >
     ✔ 解決
@@ -295,6 +330,17 @@ useEffect(() => {
                 cursor: "pointer",
               }}
               onClick={() => {
+                fetch(`${API_BASE}/log`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({  
+                    type: "confirm",   
+                    result: "yes",  
+                    user: username, 
+                    room: room 
+                  }),
+                });
+
                 if (ws) {
                   ws.send(
                     JSON.stringify({
@@ -305,6 +351,7 @@ useEffect(() => {
                 }
                 setAlreadyTroubled(true);
                 setShowConfirm(false);
+                setAutoDetected(false);
                 setConfirmNotified(false);
               }}
             >
@@ -320,7 +367,18 @@ useEffect(() => {
                 cursor: "pointer",
               }}
               onClick={() => {
+                fetch(`${API_BASE}/log`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    type: "confirm",
+                    result: "no",
+                    user: username,
+                    room: room
+                  }),
+                });  
                 setShowConfirm(false);
+                setAutoDetected(false);
                 setConfirmNotified(false);              
               }}
             >
